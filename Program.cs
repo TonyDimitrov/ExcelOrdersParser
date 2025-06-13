@@ -30,7 +30,8 @@ namespace Werehouse
 
                     services.AddTransient<ExcelOrderProcessorService>();
                     services.AddTransient<OrdersAdaptorService>();
-                    services.AddTransient<StatusProvider>();
+
+                    services.AddSingleton<StatusProvider>();
                 });
         }
     }

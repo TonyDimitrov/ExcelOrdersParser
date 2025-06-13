@@ -22,7 +22,7 @@ namespace Werehouse
         {
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
-                openFileDialog.Filter = "All files (*.*)|*.*";
+                openFileDialog.Filter = "File types (*.xlsx*)|*.xlsx*";
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
                     lblStatus.Text = $"Selected: {Path.GetFileName(openFileDialog.FileName)}";
@@ -30,7 +30,9 @@ namespace Werehouse
 
                     List<Order> orders =  _processorService.ReadOrdersFromExcel(openFileDialog.FileName);
 
-                    //_processorService.
+                    var (grouped, invalid) = _ordersAdaptorService.CalculateOrdersQuantity(orders);
+
+                    _processorService.GenerateReport(grouped, "C:\\Reports\\output.xlsx");
                 }
             }
         }

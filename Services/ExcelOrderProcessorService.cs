@@ -1,5 +1,7 @@
-﻿using Werehouse.Models;
+﻿using ClosedXML.Excel;
 using OfficeOpenXml;
+using System.Drawing;
+using Werehouse.Models;
 
 namespace Werehouse.Services
 {
@@ -33,19 +35,19 @@ namespace Werehouse.Services
                         };
 
                         string status1 = worksheet.Cells[row, 9].Value?.ToString();
-                        if (string.IsNullOrWhiteSpace(status1))
+                        if (!string.IsNullOrWhiteSpace(status1))
                             order.Statuses.Enqueue(status1);
 
                         string status2 = worksheet.Cells[row, 10].Value?.ToString();
-                        if (string.IsNullOrWhiteSpace(status2))
+                        if (!string.IsNullOrWhiteSpace(status2))
                             order.Statuses.Enqueue(status2);
 
                         string status3 = worksheet.Cells[row, 11].Value?.ToString();
-                        if (string.IsNullOrWhiteSpace(status3))
+                        if (!string.IsNullOrWhiteSpace(status3))
                             order.Statuses.Enqueue(status3);
 
                         string status4 = worksheet.Cells[row, 12].Value?.ToString();
-                        if (string.IsNullOrWhiteSpace(status4))
+                        if (!string.IsNullOrWhiteSpace(status4))
                             order.Statuses.Enqueue(status4);
 
                         orders.Add(order);
@@ -58,6 +60,85 @@ namespace Werehouse.Services
             }
 
             return orders;
+        }
+
+        public void GenerateReport(List<CalculatedOrder> orders, string filePath)
+        {
+            // Group by PharmacyName and Product, sum quantities
+            var groupedData = orders
+                .Where(o => o.IsValid)
+                .GroupBy(o => new { o.PharmacyName, o.Product })
+                .Select(g => new
+                {
+                    PharmacyName = g.Key.PharmacyName,
+                    Product = g.Key.Product,
+                    RequestedQuantity = g.Sum(x => x.RequestedQuantity),
+                    TotalQuantity = g.Sum(x => x.RequestedQuantity + x.RabatQuantity),
+                    HasCompleted = g.Any(x => x.FlagCompleted),
+                    HasPartial = g.Any(x => x.FlagPartiallyDone),
+                    HasDelay = g.Any(x => x.FlagDalay)
+                })
+                .OrderBy(x => x.PharmacyName)
+                .ThenBy(x => x.Product)
+                .ToList();
+
+            // Create Excel workbook
+            using (var workbook = new XLWorkbook())
+            {
+                var worksheet = workbook.Worksheets.Add("Лист1");
+
+                // Headers
+                worksheet.Cell(1, 1).Value = "Артикул";
+                worksheet.Cell(1, 2).Value = "Клиент";
+                worksheet.Cell(1, 3).Value = "Продадено количество";
+                worksheet.Cell(1, 4).Value = "пакет";
+                worksheet.Cell(1, 5).Value = "Изпълнена";
+                worksheet.Cell(1, 6).Value = "Частично изпълнена";
+                worksheet.Cell(1, 7).Value = "Отложена";
+
+                // Style headers
+                var headerRange = worksheet.Range(1, 1, 1, 6);
+                headerRange.Style.Font.Bold = true;
+                headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                // Data rows
+                int row = 2;
+                foreach (var item in groupedData)
+                {
+                    worksheet.Cell(row, 1).Value = item.Product;
+                    worksheet.Cell(row, 2).Value = item.PharmacyName;
+                    worksheet.Cell(row, 3).Value = item.RequestedQuantity;
+                    worksheet.Cell(row, 4).Value = item.TotalQuantity > item.RequestedQuantity
+                        ? $"{item.RequestedQuantity}+{item.TotalQuantity - item.RequestedQuantity}"
+                        : string.Empty;
+
+                    if (item.HasCompleted)
+                    {
+                        worksheet.Cell(row, 5).Value = "да";
+                        worksheet.Cell(row, 5).Style.Fill.BackgroundColor = XLColor.Green;
+                    }
+
+                    if (item.HasPartial)
+                    {
+                        worksheet.Cell(row, 6).Value = "да";
+                        worksheet.Cell(row, 6).Style.Fill.BackgroundColor = XLColor.Orange;
+                    }
+
+                    if (item.HasDelay)
+                    {
+                        worksheet.Cell(row, 7).Value = "да";
+                        worksheet.Cell(row, 7).Style.Fill.BackgroundColor = XLColor.Red;
+                    }
+
+                    row++;
+                }
+
+                // Auto-fit columns
+                worksheet.Columns().AdjustToContents();
+
+                // Save the file
+                workbook.SaveAs(filePath);
+            }
         }
 
         private DateTime GetDateTimeFromExcel(object excelValue)

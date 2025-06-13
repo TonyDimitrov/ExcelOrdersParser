@@ -15,7 +15,8 @@
             Completed.Add("изпълнена");
             Completed.Add("изпълнено");
 
-            Delay.Add("отложена");
+            Delay.Add("отожена");
+            Delay.Add("отложено");
             Delay.Add("отложено");
 
             Partially.Add("частично");

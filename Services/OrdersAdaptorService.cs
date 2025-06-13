@@ -35,13 +35,13 @@ namespace Werehouse.Services
         private List<CalculatedOrder> GroupOrders(List<CalculatedOrder> calculatedOrders)
         {
             return calculatedOrders
-                  .Where(o => o.IsValid) // Exclude invalid orders
+                  .Where(o => o.IsValid)
                   .GroupBy(o => new { o.PharmacyName, o.Product })
                   .Select(g => new CalculatedOrder
                   {
                       PharmacyName = g.Key.PharmacyName,
                       Product = g.Key.Product,
-                      RequestedQuantity = g.Sum(x => x.RequestedQuantity),
+                      RequestedQuantity = g.Sum(x => x.RequestedQuantity) + g.Where(x => !x.FlagCompleted && x.FlagPartiallyDone).Sum(x => x.PartialQuantity),
                       RabatQuantity = g.Sum(x => x.RabatQuantity),
                       PartialQuantity = g.Sum(x => x.PartialQuantity),
                       FlagCompleted = g.Any(x => x.FlagCompleted),
@@ -64,22 +64,15 @@ namespace Werehouse.Services
                 }
                 if (IsOrderDelayed(order, calculatedOrder))
                 {
-                    calculatedOrders.Add(calculatedOrder);
-
                     continue;
                 }
                 if (IsOrderPartuallyCompleted(order, calculatedOrder))
                 {
-                    calculatedOrders.Add(calculatedOrder);
-
                     continue;
                 }
 
                 // Exceptional case
                 ExceptionalCase(order, calculatedOrder);
-                calculatedOrders.Add(calculatedOrder);
-
-                return;
             }
         }
 
@@ -121,8 +114,8 @@ namespace Werehouse.Services
                 calculatedOrder.RequestNumber = order.RequestNumber;
                 calculatedOrder.PharmacyName = order.PharmacyName;
                 calculatedOrder.Product = order.Product;
-                calculatedOrder.RequestedQuantity = order.RequestedQuantity;
-                calculatedOrder.RabatQuantity = order.RabatQuantity;
+                //calculatedOrder.RequestedQuantity = order.RequestedQuantity;
+                //calculatedOrder.RabatQuantity = order.RabatQuantity;
                 calculatedOrder.FlagDalay = true;
 
                 order.Statuses.Dequeue();
@@ -146,9 +139,9 @@ namespace Werehouse.Services
                 calculatedOrder.RequestNumber = order.RequestNumber;
                 calculatedOrder.PharmacyName = order.PharmacyName;
                 calculatedOrder.Product = order.Product;
-                calculatedOrder.RequestedQuantity = order.RequestedQuantity;
-                calculatedOrder.RabatQuantity = order.RabatQuantity;
-                calculatedOrder.FlagDalay = true;
+                //calculatedOrder.RequestedQuantity = order.RequestedQuantity;
+                //calculatedOrder.RabatQuantity = order.RabatQuantity;
+                calculatedOrder.FlagPartiallyDone = true;
 
                 string[] statusParts = status.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 int partialQuantity = 0;
